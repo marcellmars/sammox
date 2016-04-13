@@ -1,18 +1,19 @@
-import socket
-import logging
+import SocketServer
+import json
 
-logging.basicConfig(filename = 'hellonetworking.log', 
-                    level = logging.DEBUG, 
-                    format ='%(asctime)s: %(filename)s >> %(levelname)s - %(message)s')
+class MyTCPServer(SocketServer.ThreadingTCPServer):
+    allow_reuse_address = True
 
+class MyTCPServerHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        try:
+            data = json.loads(self.request.recv(1024).strip())
+            # process the data, i.e. print it:
+            print data
+            # send some 'ok' back
+            self.request.sendall(json.dumps({'return':'ok'}))
+        except Exception, e:
+            print "Exception wile receiving message: ", e
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(("", 1972))
-client.send("Client sends greetings")
-logging.info("Client received: %s" % client.recv(1024))
-client.close()
-
-#### run client *after* the server.
-## 1. client sends string
-## 2. client writes into logging file what it received from server
-## 3. client closes session
+server = MyTCPServer(('127.0.0.1', 13373), MyTCPServerHandler)
+server.serve_forever()

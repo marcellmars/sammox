@@ -20,7 +20,7 @@ $.get('http://127.0.0.1:8001/?fooarg=tralala,'+ Math.round(Math.random()*100),
 '''
 PORT = 8001
 
-class Handler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class HTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200, 'OK')
         self.send_header('Allow', 'GET, POST, OPTIONS')
@@ -36,24 +36,22 @@ class Handler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.server.qobject.my_signal.emit(self.path)
         self.wfile.write('You sent: {}'.format(self.path))
 
+class ThreadedServer(QtCore.QThread):
+    my_signal = QtCore.pyqtSignal(str, name="my_signal")
+    def __init__(self):
+        QtCore.QThread.__init__(self)
+        SocketServer.TCPServer.allow_reuse_address = True
+        self.httpd = SocketServer.TCPServer(("", PORT), HTTPHandler)
+        self.httpd.qobject = self
+    def run(self):
+        self.httpd.serve_forever()
+
+
 class MyGui(QtGui.QLineEdit):
     def __init__(self):
         QtGui.QLineEdit.__init__(self)
     def after_signal(self, arg):
         self.setText(arg)
-
-class ProxySignal(QtCore.QObject):
-    my_signal = QtCore.pyqtSignal(str, name="my_signal")
-    def __init__(self):
-        QtCore.QObject.__init__(self)
-
-class ThreadedServer(QtCore.QThread):
-    def __init__(self):
-        QtCore.QThread.__init__(self)
-        SocketServer.TCPServer.allow_reuse_address = True
-        self.httpd = SocketServer.TCPServer(("", PORT), Handler)
-    def run(self):
-        self.httpd.serve_forever()
 
 app = QtGui.QApplication(sys.argv)
 app.setApplicationName("tcpserver")
@@ -63,7 +61,6 @@ my_gui.show()
 my_gui.resize(400,40)
 
 server = ThreadedServer()
-server.httpd.qobject = ProxySignal()
 server.httpd.qobject.my_signal.connect(my_gui.after_signal)
 server.start()
 
